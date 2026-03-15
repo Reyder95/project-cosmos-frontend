@@ -1,10 +1,29 @@
+import '@mantine/core/styles.css';
+
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 
+import { MantineProvider } from '@mantine/core';
+import { createBrowserRouter, RouterProvider } from 'react-router';
+
+export const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <App />
+  },
+  {
+    path: '/galaxy-editor',
+    element: <div>Galaxy Editor</div>
+  }
+])
+
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <MantineProvider>
+      <RouterProvider router={router} />
+    </MantineProvider>
   </StrictMode>,
 )
