@@ -7,6 +7,7 @@ import App from './App.tsx'
 
 import { MantineProvider } from '@mantine/core';
 import { createBrowserRouter, RouterProvider } from 'react-router';
+import GalaxyEditor from './Pages/GalaxyEditor.tsx';
 
 export const router = createBrowserRouter([
   {
@@ -15,7 +16,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/galaxy-editor',
-    element: <div>Galaxy Editor</div>
+    element: <GalaxyEditor />
   }
 ])
 
