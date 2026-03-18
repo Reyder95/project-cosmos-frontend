@@ -75,10 +75,6 @@ export default function GalaxyEditor() {
 
     useEffect(() => {
         galaxyGraphRef.current = graph;
-
-        console.log("Testing graph value", galaxyGraphRef.current);
-        console.log("Number of nodes:", Object.keys(galaxyGraphRef.current).length);
-        console.log("Testing galaxy map", galaxyMap)
     }, [graph])
 
     return (
