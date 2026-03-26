@@ -1,38 +1,91 @@
 import { Arc, Circle, Layer, Line, Stage, Text } from "react-konva";
 import type { StarGate, StarSystem, Point } from '../interfaces';
-import { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import type Konva from "konva";
 
-const systemList: StarSystem[] = [{
-    id: 1,
-    system_identifier: 'solar',
-    system_name: 'Solar System',
-    position: { x: 200, y: 300 },
-    gates: [{
-        position: { x: 200, y: 200 },
-        system_identifier: 'alpha_centauri'
-    }]
-}, 
-{
-    id: 2,
-    system_identifier: 'alpha_centauri',
-    system_name: 'Alpha Centauri',
-    position: { x: 500, y: 200 },
-    gates: [{
-        position: { x: 500, y: 200 },
-        system_identifier: 'solar'
-    }]
-}];
+// const systemList: StarSystem[] = [{
+//     id: 1,
+//     system_identifier: 'solar',
+//     system_name: 'Solar System',
+//     position: { x: 200, y: 300 },
+//     gates: [{
+//         position: { x: 200, y: 200 },
+//         system_identifier: 'alpha_centauri'
+//     }]
+// }, 
+// {
+//     id: 2,
+//     system_identifier: 'alpha_centauri',
+//     system_name: 'Alpha Centauri',
+//     position: { x: 500, y: 200 },
+//     gates: [{
+//         position: { x: 500, y: 200 },
+//         system_identifier: 'solar'
+//     }]
+// }];
 
-const galaxyMap : Record<string, StarSystem> = {};
+//const galaxyMap : Record<string, StarSystem> = {};
 
 type Graph = Record<string, string[]>;
 
 export default function GalaxyEditor() {
-
+    
     const width = window.innerWidth;
     const height = window.innerHeight;
     const stageRef = useRef<Konva.Stage | null>(null);
+
+    const [galaxyMap, setGalaxyMap] = useState<Record<string, StarSystem>>({});
+    const mouseScaleRef = useRef<number>(1.0);
+
+    const [isDragging, setIsDragging] = useState<boolean>(false);
+    const [pos, setPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+    const lastPointer = useRef<{ x: number; y: number } | null>(null);
+
+    const handleMiddleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+        if (e.evt.button === 1) {
+            e.evt.preventDefault();
+            console.log("Middle mouse test!");
+            setIsDragging(true);
+            lastPointer.current = { x: e.evt.clientX, y: e.evt.clientY };
+        }
+    }
+
+    const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
+        if (!isDragging || lastPointer.current == null) return;
+
+        const dx = e.evt.clientX - lastPointer.current.x;
+        const dy = e.evt.clientY - lastPointer.current.y;
+        lastPointer.current = { x: e.evt.clientX, y: e.evt.clientY}
+        setPos((prev) => ({ x: prev.x + dx, y: prev.y + dy}))
+    }
+
+    const handleMouseUp = (e: Konva.KonvaEventObject<MouseEvent>) => {
+        if (e.evt.button === 1) {
+            setIsDragging(false);
+            lastPointer.current = null;
+        }
+    }
+
+
+    const generateGalaxy = (numStars: number, topLeft: Point, width: number, height: number) : StarSystem[] => {
+        const systems: StarSystem[] = [];
+
+        for (let i = 0; i < numStars; i++) {
+            const system: StarSystem = {
+                id: i,
+                system_identifier: `system_${i}`,
+                system_name: `System ${i}`,
+                position: {
+                    x: topLeft.x + Math.random() * width,
+                    y: topLeft.y + Math.random() * height
+                },
+                gates: []
+
+            }
+            systems.push(system);
+        }
+        return systems;
+    }
 
     const handleWheel = (e) => {
         e.evt.preventDefault();
@@ -56,11 +109,14 @@ export default function GalaxyEditor() {
         const scaleBy = 1.2;
         const newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy;
 
+        mouseScaleRef.current = newScale;
+
         stage.scale({ x: newScale, y: newScale });
         const newPos = {
             x: pointer.x - mousePointTo.x * newScale,
             y: pointer.y - mousePointTo.y * newScale
         };
+        setPos(newPos)
         stage.position(newPos);
         stage.batchDraw();
 
@@ -98,36 +154,53 @@ export default function GalaxyEditor() {
     }
 
     const graph = useMemo(() => {
+        
+        let systemList = generateGalaxy(10, { x: 0, y: 0 }, 5000, 5000);
+
+        setGalaxyMap(systemList.reduce((acc, system) => {
+            acc[system.system_identifier] = system;
+            return acc;
+        }, {} as Record<string, StarSystem>));
+
+        console.log("TEST!");
+
         return build_graph(systemList);
-    }, [systemList])
+    }, [])
 
-    const galaxyMap = useMemo(() => {
-        const map: Record<string, StarSystem> = {};
+    // const buildGalaxyMap = useMemo(() => {
+    //     const map: Record<string, StarSystem> = {};
 
-        for (const system of systemList) {
-            map[system.system_identifier] = system;
-        }
-        return map;
-    }, [systemList]);
+    //     for (const system of systemList) {
+    //         map[system.system_identifier] = system;
+    //     }
+    //     return map;
+    // }, [systemList]);
 
     useEffect(() => {
-        galaxyGraphRef.current = graph;
+        //galaxyGraphRef.current = graph;
     }, [graph])
 
     return (
         <div>
-            <Stage 
-            draggable
+            <Stage
             width={window.innerWidth} 
             height={window.innerHeight}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseDown={handleMiddleMouseDown}
             style={{ backgroundColor: '#0a0a1f' }}
             onWheel={handleWheel}
+            x={pos.x}
+            y={pos.y}
             ref={stageRef}
             >
+                <Layer>
                 {Object.values(galaxyMap).map((system) => (
-                    <Layer key={system.system_identifier}>
+                    <React.Fragment key={system.system_identifier}>
+
                         {system.gates.map((gate) => (
                             <Line
+                                listening={false}
                                 key={gate.system_identifier}
                                 points={[system.position.x, system.position.y, galaxyMap[gate.system_identifier].position.x, galaxyMap[gate.system_identifier].position.y]}
                                 stroke="white"
@@ -135,13 +208,14 @@ export default function GalaxyEditor() {
                             />
                         ))}
 
-                    </Layer>
-
+                    </React.Fragment>
                 ))}
-
+                </Layer>
+                <Layer perfectDrawEnabled={false}>
                 {Object.values(galaxyMap).map((system) => (
-                        <Layer key={system.system_identifier}>
+                        <React.Fragment key={system.system_identifier}>
                             <Text
+                                listening={false}
                                 x={system.position.x}
                                 y={system.position.y - 40}
                                 fontStyle={"bold"}
@@ -151,18 +225,26 @@ export default function GalaxyEditor() {
                                 width={200}
                                 offsetX={100}
                                 align={"center"}
+                                ref={(node) => {
+                                    if (node) node.cache();        // ← cache immediately
+                                }}
                             />
 
                             <Circle
+                            listening={false}
                             x={system.position.x}
                             y={system.position.y}
                             radius={8}
                             fill="yellow"
                             shadowBlur={20}
                             shadowColor="yellow"
+                            ref={(node) => {
+                                    if (node) node.cache();        // ← cache immediately
+                                }}
                             />
-                        </Layer>
+                        </React.Fragment>
                 ))}
+                </Layer>
 
                 {/* <Layer>
                     <Line
