@@ -2,6 +2,8 @@ import { Arc, Circle, Layer, Line, Stage, Text } from "react-konva";
 import type { StarGate, StarSystem, Point } from '../interfaces';
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type Konva from "konva";
+import BottomToolbar from "../components/GalaxyEditor/BottomToolbar";
+import SideToolbar from "../components/GalaxyEditor/SideToolbar";
 
 // const systemList: StarSystem[] = [{
 //     id: 1,
@@ -182,13 +184,15 @@ export default function GalaxyEditor() {
 
     return (
         <div>
+            <BottomToolbar />
+            <SideToolbar /> 
             <Stage
             width={window.innerWidth} 
             height={window.innerHeight}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseDown={handleMiddleMouseDown}
-            style={{ backgroundColor: '#0a0a1f' }}
+            style={{ backgroundColor: '#12151f' }}
             onWheel={handleWheel}
             x={pos.x}
             y={pos.y}
