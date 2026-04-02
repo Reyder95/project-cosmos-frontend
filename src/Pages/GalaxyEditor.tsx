@@ -1,7 +1,7 @@
 import { Arc, Circle, Layer, Line, Stage, Text } from "react-konva";
 import type { StarGate, StarSystem, Point } from '../interfaces';
 import { Tools } from '../enums';
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { use, useEffect, useMemo, useRef, useState } from "react";
 import type Konva from "konva";
 import BottomToolbar from "../components/GalaxyEditor/BottomToolbar";
 import SideToolbar from "../components/GalaxyEditor/SideToolbar";
@@ -40,33 +40,64 @@ export default function GalaxyEditor() {
     const [galaxyMap, setGalaxyMap] = useState<Record<string, StarSystem>>({});
     const mouseScaleRef = useRef<number>(1.0);
 
-    const [isDragging, setIsDragging] = useState<boolean>(false);
+    const isDraggingRef = useRef<boolean>(false);
     const [pos, setPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     const lastPointer = useRef<{ x: number; y: number } | null>(null);
+    const [mousePointer, setMousePointer] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     
     const[selectedTool, setSelectedTool] = useState<Tools>(Tools.SELECT);
+    const[selectedSelectionTools, setSelectedSelectionTools] = useState<Tools[]>([Tools.STAR, Tools.LINK]);
+
+    const cursorCircleRef = useRef<Konva.Circle>(null);
 
     const handleMiddleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
         if (e.evt.button === 1) {
             e.evt.preventDefault();
             console.log("Middle mouse test!");
-            setIsDragging(true);
+            isDraggingRef.current = true;
             lastPointer.current = { x: e.evt.clientX, y: e.evt.clientY };
         }
     }
 
     const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
-        if (!isDragging || lastPointer.current == null) return;
+        const stage = stageRef.current;
+        
+        if (cursorCircleRef.current != undefined && stage != undefined)
+        {
+
+            const cursorCircle = cursorCircleRef.current;
+            const scale = stage.scaleX();
+            const pointer = stage.getPointerPosition();
+
+            if (pointer == null) return;
+
+            const x = (pointer.x - stage.x()) / scale;
+            const y = (pointer.y - stage.y()) / scale;
+            
+            cursorCircle.x(x);
+            cursorCircle.y(y);
+            cursorCircle.getLayer()?.batchDraw();
+        }
+        
+
+        if (!isDraggingRef.current || !lastPointer.current || !stage) return;
 
         const dx = e.evt.clientX - lastPointer.current.x;
         const dy = e.evt.clientY - lastPointer.current.y;
         lastPointer.current = { x: e.evt.clientX, y: e.evt.clientY}
-        setPos((prev) => ({ x: prev.x + dx, y: prev.y + dy}))
+
+        const newPos = {
+            x: stage.x() + dx,
+            y: stage.y() + dy
+        }
+
+        stage.position(newPos);
+        stage.batchDraw();
     }
 
     const handleMouseUp = (e: Konva.KonvaEventObject<MouseEvent>) => {
         if (e.evt.button === 1) {
-            setIsDragging(false);
+            isDraggingRef.current = false;
             lastPointer.current = null;
         }
     }
@@ -121,7 +152,6 @@ export default function GalaxyEditor() {
             x: pointer.x - mousePointTo.x * newScale,
             y: pointer.y - mousePointTo.y * newScale
         };
-        setPos(newPos)
         stage.position(newPos);
         stage.batchDraw();
 
@@ -160,7 +190,7 @@ export default function GalaxyEditor() {
 
     const graph = useMemo(() => {
         
-        let systemList = generateGalaxy(10, { x: 0, y: 0 }, 5000, 5000);
+        let systemList = generateGalaxy(50, { x: 0, y: 0 }, 5000, 5000);
 
         setGalaxyMap(systemList.reduce((acc, system) => {
             acc[system.system_identifier] = system;
@@ -170,31 +200,30 @@ export default function GalaxyEditor() {
         return build_graph(systemList);
     }, [])
 
-    // const buildGalaxyMap = useMemo(() => {
-    //     const map: Record<string, StarSystem> = {};
-
-    //     for (const system of systemList) {
-    //         map[system.system_identifier] = system;
-    //     }
-    //     return map;
-    // }, [systemList]);
-
-    useEffect(() => {
-        //galaxyGraphRef.current = graph;
-    }, [graph])
-
     const handleToolChange = (tool: Tools) => {
         console.log("Tool selected: ", tool);
         setSelectedTool(tool);  
     }
 
+    const handleSelectionToolToggle = (tool: Tools) => {
+        setSelectedSelectionTools((prev) => {
+            if (prev.includes(tool)) {
+                return prev.filter(t => t !== tool);
+            } else {
+                return [...prev, tool];
+            }
+        });
+    }
     return (
         <div>
             <BottomToolbar 
             onToolChange={handleToolChange}
             selectedTool={selectedTool}
             />
-            <SideToolbar /> 
+            <SideToolbar
+            selectionTools={selectedSelectionTools}
+            onToolChange={handleSelectionToolToggle}
+            /> 
             <Stage
             width={window.innerWidth} 
             height={window.innerHeight}
@@ -203,10 +232,17 @@ export default function GalaxyEditor() {
             onMouseDown={handleMiddleMouseDown}
             style={{ backgroundColor: '#12151f' }}
             onWheel={handleWheel}
-            x={pos.x}
-            y={pos.y}
             ref={stageRef}
             >
+
+            <Layer>
+                <Circle 
+                    ref={cursorCircleRef}
+                    fill="yellow"
+                    radius={10}
+                />
+            </Layer>
+
                 <Layer>
                 {Object.values(galaxyMap).map((system) => (
                     <React.Fragment key={system.system_identifier}>
