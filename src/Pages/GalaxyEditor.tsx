@@ -1,5 +1,6 @@
 import { Arc, Circle, Layer, Line, Stage, Text } from "react-konva";
 import type { StarGate, StarSystem, Point } from '../interfaces';
+import { Tools } from '../enums';
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type Konva from "konva";
 import BottomToolbar from "../components/GalaxyEditor/BottomToolbar";
@@ -42,6 +43,8 @@ export default function GalaxyEditor() {
     const [isDragging, setIsDragging] = useState<boolean>(false);
     const [pos, setPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     const lastPointer = useRef<{ x: number; y: number } | null>(null);
+    
+    const[selectedTool, setSelectedTool] = useState<Tools>(Tools.SELECT);
 
     const handleMiddleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
         if (e.evt.button === 1) {
@@ -89,7 +92,7 @@ export default function GalaxyEditor() {
         return systems;
     }
 
-    const handleWheel = (e) => {
+    const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
         e.evt.preventDefault();
 
         const stage = stageRef.current;
@@ -164,8 +167,6 @@ export default function GalaxyEditor() {
             return acc;
         }, {} as Record<string, StarSystem>));
 
-        console.log("TEST!");
-
         return build_graph(systemList);
     }, [])
 
@@ -182,9 +183,17 @@ export default function GalaxyEditor() {
         //galaxyGraphRef.current = graph;
     }, [graph])
 
+    const handleToolChange = (tool: Tools) => {
+        console.log("Tool selected: ", tool);
+        setSelectedTool(tool);  
+    }
+
     return (
         <div>
-            <BottomToolbar />
+            <BottomToolbar 
+            onToolChange={handleToolChange}
+            selectedTool={selectedTool}
+            />
             <SideToolbar /> 
             <Stage
             width={window.innerWidth} 
