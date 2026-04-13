@@ -2,7 +2,7 @@ import { Arc, Circle, Layer, Line, Stage, Text } from "react-konva";
 import type { StarGate, StarSystem, Point } from '../interfaces';
 import { Tools } from '../enums';
 import React, { use, useEffect, useMemo, useRef, useState } from "react";
-import type Konva from "konva";
+import Konva from "konva";
 import BottomToolbar from "../components/GalaxyEditor/BottomToolbar";
 import SideToolbar from "../components/GalaxyEditor/SideToolbar";
 
@@ -32,36 +32,88 @@ import SideToolbar from "../components/GalaxyEditor/SideToolbar";
 type Graph = Record<string, string[]>;
 
 export default function GalaxyEditor() {
-    
-    const width = window.innerWidth;
-    const height = window.innerHeight;
+
     const stageRef = useRef<Konva.Stage | null>(null);
 
-    const [galaxyMap, setGalaxyMap] = useState<Record<string, StarSystem>>({});
+    const galaxyMapRef = useRef<Record<string, StarSystem>>({});
     const mouseScaleRef = useRef<number>(1.0);
 
     const isDraggingRef = useRef<boolean>(false);
-    const [pos, setPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     const lastPointer = useRef<{ x: number; y: number } | null>(null);
-    const [mousePointer, setMousePointer] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     
     const[selectedTool, setSelectedTool] = useState<Tools>(Tools.SELECT);
     const[selectedSelectionTools, setSelectedSelectionTools] = useState<Tools[]>([Tools.STAR, Tools.LINK]);
 
     const cursorCircleRef = useRef<Konva.Circle>(null);
+    const starLayerRef = useRef<Konva.Layer>(null);
+    const linkLayerRef = useRef<Konva.Layer>(null);
 
+    const selectedNodeRef = useRef<Konva.Circle | null>(null);
+    const starRefs = useRef<Record<string, Konva.Circle>>({});
+    const selectionOutlineRef = useRef<Konva.Circle | null>(null);
+    const animRef = useRef<Konva.Animation | null>(null);
+
+
+    // Based on the tool and mouse button, do various things
     const handleMiddleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+
+        // Set dragging if middle mouse button is pressed to start panning around the stage
         if (e.evt.button === 1) {
             e.evt.preventDefault();
             console.log("Middle mouse test!");
             isDraggingRef.current = true;
             lastPointer.current = { x: e.evt.clientX, y: e.evt.clientY };
+        } 
+        // If we're on the star tool and we left click, place a star down on the stage directly via refs as well as
+        // add a star to the galaxy map.
+        else if (e.evt.button === 0 && selectedTool === Tools.STAR) {
+            const addedSystem = addSystemToMap();
+
+            const layer = starLayerRef.current;
+            if (addedSystem && layer) {
+                const textNode = new Konva.Text({
+                    listening: false,
+                    x: addedSystem.position.x,
+                    y: addedSystem.position.y - 40,
+                    text: addedSystem.system_name,
+                    fontSize: 14,
+                    fontStyle: 'bold',
+                    width: 200,
+                    offsetX: 100,
+                    align: 'center',
+                    fill: 'white',
+                    ref: (node: any) => {
+                        if (node) node.cache();        // ← cache immediately
+                    }
+                });
+
+                const circleNode = new Konva.Circle({
+                    x: addedSystem.position.x,
+                    y: addedSystem.position.y,
+                    radius: 8,
+                    fill: 'yellow',
+                    shadowBlur: 20,
+                    shadowColor: 'yellow',
+                    ref: (node: any) => {
+                        if (node) {
+                            node.cache();
+                            starRefs.current[addedSystem.system_identifier] = node;
+                        }
+                    }
+                })
+                layer.add(textNode);
+                layer.add(circleNode);
+                layer.batchDraw();
+            }
+
         }
     }
 
+    // Handle mouse movement when hovering over the stage.
     const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
         const stage = stageRef.current;
         
+        // Place the cursor circle under the mouse cursor with respect to scale / zooming.
         if (cursorCircleRef.current != undefined && stage != undefined)
         {
 
@@ -80,6 +132,7 @@ export default function GalaxyEditor() {
         }
         
 
+        // Choose the direction to pan the stage based on where our mouse is moving (mouse delta)
         if (!isDraggingRef.current || !lastPointer.current || !stage) return;
 
         const dx = e.evt.clientX - lastPointer.current.x;
@@ -95,6 +148,7 @@ export default function GalaxyEditor() {
         stage.batchDraw();
     }
 
+    // When releasing mouse button, reset lastPointer and dragging
     const handleMouseUp = (e: Konva.KonvaEventObject<MouseEvent>) => {
         if (e.evt.button === 1) {
             isDraggingRef.current = false;
@@ -103,6 +157,7 @@ export default function GalaxyEditor() {
     }
 
 
+    // Generates a randomized galaxy for testing purposes.
     const generateGalaxy = (numStars: number, topLeft: Point, width: number, height: number) : StarSystem[] => {
         const systems: StarSystem[] = [];
 
@@ -123,6 +178,7 @@ export default function GalaxyEditor() {
         return systems;
     }
 
+    // Handles zooming for us.
     const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
         e.evt.preventDefault();
 
@@ -157,8 +213,6 @@ export default function GalaxyEditor() {
 
     }
 
-    const galaxyGraphRef = useRef<Graph>({});
-
     const build_graph = (starSystems: StarSystem[]) : Graph => {
         const graph: Graph = {};
 
@@ -190,12 +244,12 @@ export default function GalaxyEditor() {
 
     const graph = useMemo(() => {
         
-        let systemList = generateGalaxy(50, { x: 0, y: 0 }, 5000, 5000);
+        let systemList = generateGalaxy(100, { x: 0, y: 0 }, 5000, 5000);
 
-        setGalaxyMap(systemList.reduce((acc, system) => {
+        galaxyMapRef.current = systemList.reduce((acc, system) => {
             acc[system.system_identifier] = system;
             return acc;
-        }, {} as Record<string, StarSystem>));
+        }, {} as Record<string, StarSystem>);
 
         return build_graph(systemList);
     }, [])
@@ -214,6 +268,102 @@ export default function GalaxyEditor() {
             }
         });
     }
+
+    const addSystemToMap = () => {
+
+        const stage = stageRef.current;
+
+        if (stage == undefined) return;
+
+        const scale = stage.scaleX();
+        const pointer = stage.getPointerPosition();
+
+        if (pointer == null) return;
+
+        const x = (pointer.x - stage.x()) / scale;
+        const y = (pointer.y - stage.y()) / scale;
+
+        const system: StarSystem = {
+            id: Object.keys(galaxyMapRef.current).length,
+            system_identifier: `system_${Object.keys(galaxyMapRef.current).length}`,
+            system_name: `System ${Object.keys(galaxyMapRef.current).length}`,
+            position: {
+                x: x,
+                y: y
+            },
+            gates: []
+        }
+        galaxyMapRef.current[system.system_identifier] = system;
+
+        return system;
+    }
+
+    const handleClickStar = (systemIdentifier: string) => {
+
+        if (selectedTool === Tools.LINK) {
+
+            const currStar = starRefs.current[systemIdentifier];
+
+            
+            animRef.current?.stop();
+            selectionOutlineRef.current?.destroy();
+
+            if (selectedNodeRef.current != null && selectedNodeRef.current !== currStar) {
+                const fromSystem = galaxyMapRef.current[selectedNodeRef.current.getAttr('systemIdentifier')];
+                const toSystem = galaxyMapRef.current[currStar.getAttr('systemIdentifier')];
+
+                fromSystem.gates.push({
+                    position: {x: 0, y: 0},
+                    system_identifier: toSystem.system_identifier
+                })
+
+                toSystem.gates.push({
+                    position: {x: 0, y: 0},
+                    system_identifier: fromSystem.system_identifier
+                })
+
+                const link = new Konva.Line({
+                    points: [fromSystem.position.x, fromSystem.position.y, toSystem.position.x, toSystem.position.y],
+                    stroke: 'white',
+                    strokeWidth: 2,
+                })
+                linkLayerRef.current?.add(link);
+
+                linkLayerRef.current?.batchDraw();
+
+                selectedNodeRef.current = null;
+                selectionOutlineRef.current = null;
+
+                return;
+            }
+
+            selectedNodeRef.current = currStar;
+
+            const outline = new Konva.Circle({
+                x: currStar.x(),
+                y: currStar.y(),
+                radius: 18,
+                stroke: '#e05555',
+                strokeWidth: 4,
+                dash: [12, 7]
+            })
+
+            selectionOutlineRef.current = outline;
+            starLayerRef.current?.add(outline);
+
+            const anim = new Konva.Animation((frame) => {
+                if (!frame) return;
+
+                outline.rotation(frame.time * 0.05);
+            }, starLayerRef.current);
+
+            animRef.current = anim;
+            anim.start();
+
+            starLayerRef.current?.batchDraw();
+        }
+    }
+
     return (
         <div>
             <BottomToolbar 
@@ -236,22 +386,28 @@ export default function GalaxyEditor() {
             >
 
             <Layer>
-                <Circle 
-                    ref={cursorCircleRef}
-                    fill="yellow"
-                    radius={10}
-                />
+                {
+                    selectedTool === Tools.STAR &&
+                    (
+                    <Circle 
+                        ref={cursorCircleRef}
+                        fill="yellow"
+                        radius={10}
+                    />
+                    )
+                }
+
             </Layer>
 
-                <Layer>
-                {Object.values(galaxyMap).map((system) => (
+                <Layer ref={linkLayerRef}>
+                {Object.values(galaxyMapRef.current).map((system) => (
                     <React.Fragment key={system.system_identifier}>
 
                         {system.gates.map((gate) => (
                             <Line
                                 listening={false}
                                 key={gate.system_identifier}
-                                points={[system.position.x, system.position.y, galaxyMap[gate.system_identifier].position.x, galaxyMap[gate.system_identifier].position.y]}
+                                points={[system.position.x, system.position.y, galaxyMapRef.current[gate.system_identifier].position.x, galaxyMapRef.current[gate.system_identifier].position.y]}
                                 stroke="white"
                                 strokeWidth={2}
                             />
@@ -260,8 +416,8 @@ export default function GalaxyEditor() {
                     </React.Fragment>
                 ))}
                 </Layer>
-                <Layer perfectDrawEnabled={false}>
-                {Object.values(galaxyMap).map((system) => (
+                <Layer ref={starLayerRef} perfectDrawEnabled={false}>
+                {Object.values(galaxyMapRef.current).map((system) => (
                         <React.Fragment key={system.system_identifier}>
                             <Text
                                 listening={false}
@@ -280,7 +436,7 @@ export default function GalaxyEditor() {
                             />
 
                             <Circle
-                            listening={false}
+                            onMouseDown={() => handleClickStar(system.system_identifier)}
                             x={system.position.x}
                             y={system.position.y}
                             radius={8}
@@ -288,8 +444,12 @@ export default function GalaxyEditor() {
                             shadowBlur={20}
                             shadowColor="yellow"
                             ref={(node) => {
-                                    if (node) node.cache();        // ← cache immediately
+                                    if (node) {
+                                        node.cache();        // ← cache immediately
+                                        starRefs.current[system.system_identifier] = node;
+                                    }
                                 }}
+                            systemIdentifier={system.system_identifier}
                             />
                         </React.Fragment>
                 ))}
