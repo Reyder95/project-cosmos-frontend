@@ -6,6 +6,7 @@ import Konva from "konva";
 import BottomToolbar from "../components/GalaxyEditor/BottomToolbar";
 import SideToolbar from "../components/GalaxyEditor/SideToolbar";
 import { useSelectionOutline } from "../utils/selectionOutline";
+import { Menu, Portal } from "@mantine/core";
 
 type Graph = Record<string, string[]>;
 
@@ -49,6 +50,9 @@ export default function GalaxyEditor() {
 
     const { attach, detach } = useSelectionOutline();
 
+    const [opened, setOpened] = useState(false);
+    const [menuPos, setMenuPos] = useState({ x: 0, y: 0 })
+
 
     useEffect(() => {
         const regionBounds = getRegionBounds();
@@ -80,7 +84,6 @@ export default function GalaxyEditor() {
     // Ref mirror, may need to just make this a full on ref instead of state
     useEffect(() => {
         selectedNodesRef.current = selectedNodes;
-        console.log(selectedNodes);
     }, [selectedNodes]);
 
     useEffect(() => {
@@ -88,18 +91,7 @@ export default function GalaxyEditor() {
             keysDownRef.current.add(e.key);
 
             if (e.key === 'Delete') {
-                selectedNodesRef.current.forEach((node) => {
-                    const currSystemIdentifier = node.getAttr('systemIdentifier');
-                    detach(currSystemIdentifier);
-
-                    delete starRefs.current[currSystemIdentifier];
-                    delete galaxyMapRef.current[currSystemIdentifier];
-
-                    node.destroy();
-
-                    setSelectedNodes(prev => prev.filter(nodeInner => nodeInner !== node));
-                    starLayerRef.current?.batchDraw();
-                })
+                deleteSystems();
             }
         }
 
@@ -179,6 +171,11 @@ export default function GalaxyEditor() {
                 addSystemToMap();
                 setGalaxyMapVersion((prev) => prev + 1);
             }
+        }
+        else if (e.evt.button === 2) {
+            e.evt.preventDefault();
+            setOpened(true);
+            setMenuPos({ x: e.evt.clientX, y: e.evt.clientY });
         }
     }
 
@@ -353,6 +350,21 @@ export default function GalaxyEditor() {
 
     // --- FUNCTIONS ---
 
+    const deleteSystems = () => {
+        selectedNodesRef.current.forEach((node) => {
+            const currSystemIdentifier = node.getAttr('systemIdentifier');
+            detach(currSystemIdentifier);
+
+            delete starRefs.current[currSystemIdentifier];
+            delete galaxyMapRef.current[currSystemIdentifier];
+
+            node.destroy();
+
+            setSelectedNodes(prev => prev.filter(nodeInner => nodeInner !== node));
+            starLayerRef.current?.batchDraw();
+        })
+    }
+
     const getRegionBounds = () => {
         const regions: Record<string, { minX: number, maxX: number, minY: number, maxY: number }> = {};
 
@@ -483,7 +495,7 @@ export default function GalaxyEditor() {
     }
 
     return (
-        <div>
+        <div onContextMenu={(e) => e.preventDefault()}>
             <BottomToolbar
                 onToolChange={handleToolChange}
                 selectedTool={selectedTool}
@@ -592,30 +604,21 @@ export default function GalaxyEditor() {
                         </React.Fragment>
                     ))}
                 </Layer>
-
-                {/* <Layer>
-                    <Line
-                        points={[200, 200, 500, 200]}
-                        stroke="white"
-                        strokeWidth={2}
-                    />
-                </Layer>
-                <Layer>
-                    <Circle 
-                        x={200}
-                        y={200}
-                        radius={10}
-                        fill="blue"
-                    />
-                    <Circle 
-                        x={500}
-                        y={200}
-                        radius={10}
-                        fill="blue"
-                    />
-                </Layer> */}
-
             </Stage>
+
+            <Portal>
+                <div style={{ position: 'fixed', top: menuPos.y, left: menuPos.x }}>
+                    <Menu opened={opened} onClose={() => setOpened(false)} position="bottom-start">
+                        <Menu.Target>
+                            <div style={{ width: 1, height: 1 }} />
+                        </Menu.Target>
+                        <Menu.Dropdown>
+                            <Menu.Item>Enter System</Menu.Item>
+                            <Menu.Item onClick={deleteSystems}>Delete System(s)</Menu.Item>
+                        </Menu.Dropdown>
+                    </Menu>
+                </div>
+            </Portal>
         </div>
     )
 }
