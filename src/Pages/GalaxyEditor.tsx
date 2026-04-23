@@ -6,7 +6,8 @@ import Konva from "konva";
 import BottomToolbar from "../components/GalaxyEditor/BottomToolbar";
 import SideToolbar from "../components/GalaxyEditor/SideToolbar";
 import { useSelectionOutline } from "../utils/selectionOutline";
-import { Menu, Portal } from "@mantine/core";
+import { Box, Button, Menu, Modal, NativeSelect, Portal } from "@mantine/core";
+import classes from '../components/GalaxyEditor/Modal.module.css'
 
 type Graph = Record<string, string[]>;
 
@@ -53,26 +54,15 @@ export default function GalaxyEditor() {
     const [opened, setOpened] = useState(false);
     const [menuPos, setMenuPos] = useState({ x: 0, y: 0 })
 
+    const [modalOpened, setModalOpened] = useState(false);
+
 
     useEffect(() => {
         const regionBounds = getRegionBounds();
 
         const labels = Object.entries(regionBounds).map(([name, bounds]) => getRegionLabel(name, bounds));
 
-        setLabels((prev) => {
-            const newLabels = [...prev];
-            for (const label of labels) {
-                const existingLabel = newLabels.find((l) => l.name === label.name);
-                if (existingLabel) {
-                    existingLabel.centerX = label.centerX;
-                    existingLabel.centerY = label.centerY;
-                    existingLabel.fontSize = label.fontSize;
-                } else {
-                    newLabels.push(label);
-                }
-            }
-            return newLabels;
-        })
+        setLabels(labels);
     }, [galaxyMapVersion])
 
     useEffect(() => {
@@ -289,7 +279,6 @@ export default function GalaxyEditor() {
                 setGalaxyMapVersion((prev) => prev + 1);
             }
         } else if (selectedTool == Tools.ERASER) {
-            console.log("Test!");
             const tempGalaxyMap = { ...galaxyMapRef.current };
             delete tempGalaxyMap[systemIdentifier];
             galaxyMapRef.current = tempGalaxyMap;
@@ -399,6 +388,25 @@ export default function GalaxyEditor() {
         linkLayerRef.current?.add(link);
 
         linkLayerRef.current?.batchDraw();
+    }
+
+    const addNodesToRegion = () => {
+
+        if (selectedNodes.length === 0) return;
+        if (currRegion === null) return;
+
+        for (const node of selectedNodes) {
+
+            const systemIdentifier = node.getAttr('systemIdentifier');
+            const tempGalaxyMap = { ...galaxyMapRef.current };
+            const currStar = tempGalaxyMap[systemIdentifier];
+            currStar.region = currRegion;
+            tempGalaxyMap[systemIdentifier] = currStar;
+            galaxyMapRef.current = tempGalaxyMap;
+            setGalaxyMapVersion((prev) => prev + 1);
+        }
+
+        setModalOpened(false);
     }
 
     const getRegionBounds = () => {
@@ -568,6 +576,7 @@ export default function GalaxyEditor() {
                             offsetX={250}
                             align="center"
                             fill="white"
+                            listening={false}
                         />
                     ))}
                     {
@@ -651,11 +660,32 @@ export default function GalaxyEditor() {
                         <Menu.Dropdown>
                             <Menu.Item disabled={selectedNodes.length !== 1}>Enter System</Menu.Item>
                             <Menu.Item onClick={linkSystems} disabled={selectedNodes.length !== 2}>Link Systems</Menu.Item>
+                            <Menu.Item onClick={() => setModalOpened(true)} disabled={selectedNodes.length === 0 || regionList.length === 0}>Add Node(s) To Region</Menu.Item>
                             <Menu.Item onClick={deleteSystems} disabled={selectedTool !== Tools.SELECT || selectedNodes.length === 0}>Delete System(s)</Menu.Item>
                         </Menu.Dropdown>
                     </Menu>
                 </div>
             </Portal>
+
+            <Modal styles={{
+                content: {
+                    backgroundColor: "#1a1f2e"
+                },
+                header: {
+                    backgroundColor: "#1a1f2e"
+                },
+                title: { color: "white", fontWeight: 700 },
+                body: { color: 'white' }
+            }} classNames={{ close: classes.close }} opened={modalOpened} onClose={() => setModalOpened(false)} title={"Regions"}>
+                <Box>
+                    Please select a region to add the selection to
+
+                    <NativeSelect value={currRegion != null ? currRegion : ""} data={regionList} onChange={(e) => setCurrRegion?.(e.target.value)} />
+
+                    <Button onClick={addNodesToRegion}>Add</Button>
+                </Box>
+            </Modal>
         </div>
     )
+
 }
