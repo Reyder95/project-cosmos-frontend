@@ -1,7 +1,7 @@
 import { Circle, Layer, Stage, Text } from "react-konva";
 import type { StarSystem } from '../utils/interfaces';
 import { Tools } from '../enums';
-import React, { useEffect, useRef, useState } from "react";
+import React, { useMemo, useEffect, useRef, useState } from "react";
 import Konva from "konva";
 import BottomToolbar from "../components/GalaxyEditor/BottomToolbar";
 import { useSelectionOutline } from "../utils/selectionOutline";
