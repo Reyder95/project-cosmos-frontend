@@ -87,6 +87,13 @@ export default function GalaxyEditor() {
     }, [selectedNodes]);
 
     useEffect(() => {
+        if (selectedTool !== Tools.SELECT) {
+            setSelectedNodes([]);
+            detach();
+        }
+    }, [selectedTool])
+
+    useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             keysDownRef.current.add(e.key);
 
@@ -229,6 +236,8 @@ export default function GalaxyEditor() {
                 const fromSystem = galaxyMapRef.current[selectedNodeRef.current.getAttr('systemIdentifier')];
                 const toSystem = galaxyMapRef.current[currStar.getAttr('systemIdentifier')];
 
+                if (fromSystem.gates.some(g => g.system_identifier === toSystem.system_identifier)) return;
+
                 fromSystem.gates.push({
                     position: { x: 0, y: 0 },
                     system_identifier: toSystem.system_identifier
@@ -363,6 +372,33 @@ export default function GalaxyEditor() {
             setSelectedNodes(prev => prev.filter(nodeInner => nodeInner !== node));
             starLayerRef.current?.batchDraw();
         })
+    }
+
+    const linkSystems = () => {
+
+        if (selectedNodes.length !== 2) return;
+
+        const fromSystem = galaxyMapRef.current[selectedNodes[0].getAttr('systemIdentifier')];
+        const toSystem = galaxyMapRef.current[selectedNodes[1].getAttr('systemIdentifier')];
+
+        fromSystem.gates.push({
+            position: { x: 0, y: 0 },
+            system_identifier: toSystem.system_identifier
+        })
+
+        toSystem.gates.push({
+            position: { x: 0, y: 0 },
+            system_identifier: fromSystem.system_identifier
+        })
+
+        const link = new Konva.Line({
+            points: [fromSystem.position.x, fromSystem.position.y, toSystem.position.x, toSystem.position.y],
+            stroke: 'white',
+            strokeWidth: 2,
+        })
+        linkLayerRef.current?.add(link);
+
+        linkLayerRef.current?.batchDraw();
     }
 
     const getRegionBounds = () => {
@@ -613,8 +649,9 @@ export default function GalaxyEditor() {
                             <div style={{ width: 1, height: 1 }} />
                         </Menu.Target>
                         <Menu.Dropdown>
-                            <Menu.Item>Enter System</Menu.Item>
-                            <Menu.Item onClick={deleteSystems}>Delete System(s)</Menu.Item>
+                            <Menu.Item disabled={selectedNodes.length !== 1}>Enter System</Menu.Item>
+                            <Menu.Item onClick={linkSystems} disabled={selectedNodes.length !== 2}>Link Systems</Menu.Item>
+                            <Menu.Item onClick={deleteSystems} disabled={selectedTool !== Tools.SELECT || selectedNodes.length === 0}>Delete System(s)</Menu.Item>
                         </Menu.Dropdown>
                     </Menu>
                 </div>
