@@ -1,10 +1,9 @@
-import { Arc, Circle, Layer, Line, Stage, Text } from "react-konva";
-import type { StarGate, StarSystem, Point } from '../utils/interfaces';
+import { Circle, Layer, Stage, Text } from "react-konva";
+import type { StarSystem } from '../utils/interfaces';
 import { Tools } from '../enums';
-import React, { use, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Konva from "konva";
 import BottomToolbar from "../components/GalaxyEditor/BottomToolbar";
-import SideToolbar from "../components/GalaxyEditor/SideToolbar";
 import { useSelectionOutline } from "../utils/selectionOutline";
 import { Box, Button, Menu, Modal, NativeSelect, Portal } from "@mantine/core";
 import classes from '../components/GalaxyEditor/Modal.module.css'
@@ -22,13 +21,7 @@ export default function GalaxyEditor() {
     const isDraggingRef = useRef<boolean>(false);
     const lastPointer = useRef<{ x: number; y: number } | null>(null);
 
-    const isSelectingRef = useRef<boolean>(false);
-    const selectionStartRef = useRef<{ x: number; y: number } | null>(null);
-
-    const [selBox, setSelBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
-
     const [selectedTool, setSelectedTool] = useState<Tools>(Tools.SELECT);
-    const [selectedSelectionTools, setSelectedSelectionTools] = useState<Tools[]>([Tools.STAR, Tools.LINK]);
 
     const [regionList, setRegionList] = useState<string[]>([]);
     const [currRegion, setCurrRegion] = useState<string | null>(null);
@@ -61,7 +54,6 @@ export default function GalaxyEditor() {
         const regionBounds = getRegionBounds();
 
         const labels = Object.entries(regionBounds).map(([name, bounds]) => getRegionLabel(name, bounds));
-
         setLabels(labels);
     }, [galaxyMapVersion])
 
@@ -336,16 +328,6 @@ export default function GalaxyEditor() {
         setSelectedTool(tool);
     }
 
-    const handleSelectionToolToggle = (tool: Tools) => {
-        setSelectedSelectionTools((prev) => {
-            if (prev.includes(tool)) {
-                return prev.filter(t => t !== tool);
-            } else {
-                return [...prev, tool];
-            }
-        });
-    }
-
     // --- FUNCTIONS ---
 
     const deleteSystems = () => {
@@ -496,7 +478,7 @@ export default function GalaxyEditor() {
         return graph;
     }
 
-    const graph = useMemo(() => {
+    useMemo(() => {
 
         let systemList = generateGalaxy(25, { x: 0, y: 0 }, 5000, 5000);
 
@@ -505,7 +487,12 @@ export default function GalaxyEditor() {
             return acc;
         }, {} as Record<string, StarSystem>);
 
-        return build_graph(systemList);
+        build_graph(systemList);
+
+        const regions = getRegionBounds();
+        const labels = Object.entries(regions).map(([name, bounds]) => getRegionLabel(name, bounds));
+
+        setRegionList(labels.map((label) => label.name));
     }, [])
 
     const addSystemToMap = () => {
@@ -547,10 +534,6 @@ export default function GalaxyEditor() {
                 regionList={regionList}
                 onRegionChange={handleRegionChange}
                 currentRegion={currRegion}
-            />
-            <SideToolbar
-                selectionTools={selectedSelectionTools}
-                onToolChange={handleSelectionToolToggle}
             />
             <Stage
                 onContextMenu={(e) => e.evt.preventDefault()}
